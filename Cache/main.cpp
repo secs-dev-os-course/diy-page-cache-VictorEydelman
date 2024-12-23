@@ -44,6 +44,7 @@ int lab2_open(const char *path) {
         cacheBlock->prev = nullptr;
         cacheBlock->number = 0;
         cacheBlock->page_number=-1;
+        cacheBlock->last_save= time(0);
         cache.cache_head = cacheBlock;
         cache.cache_tail = cacheBlock;
     } else if (cache.cache_tail->number + 1 < cache.cache_size) {
@@ -52,6 +53,7 @@ int lab2_open(const char *path) {
         cacheBlock->next = nullptr;
         cacheBlock->data = time(0);
         cacheBlock->prev = cache.cache_tail;
+        cacheBlock->last_save= time(0);
         cacheBlock->number = cache.cache_tail->number + 1;
         cache.cache_tail->next = cacheBlock;
         cache.cache_tail = cacheBlock;
@@ -69,6 +71,7 @@ int lab2_open(const char *path) {
         close(minblock->fd);
         minblock->fd = fd;
         minblock->data = time(0);
+        minblock->last_save= time(0);
     }
     return fd;
 }
@@ -131,6 +134,7 @@ void addpage(int fd, CacheBlock *block, int page_num, char *page,bool t) {
     if (block->page_number == -1) {
         block->page = page;
         block->page_number = 0;
+        block->last_save= time(0);
         if (block->prev != nullptr) {
             block->prev->next = block;
         } else {
@@ -158,6 +162,7 @@ void addpage(int fd, CacheBlock *block, int page_num, char *page,bool t) {
                 block1->prev = block;
                 block->next = block1;
                 block1->page = page;
+                block1->last_save= time(0);
                 block1->page_number = page_num;
 
                 if (block->prev != nullptr) {
@@ -302,8 +307,10 @@ int lab2_fsync(int fd) {
                     break;
                 }
             }
-            lseek(fd, block->page_number * Page_count, SEEK_SET);
-            write(fd, block->page, page_size);
+            if(block->last_save<block->data) {
+                lseek(fd, block->page_number * Page_count, SEEK_SET);
+                write(fd, block->page, page_size);
+            }
             block = block->next;
         } else {
             break;
@@ -312,9 +319,6 @@ int lab2_fsync(int fd) {
     return 0;
 }
 }
-
-
-
 #ifdef __cplusplus
 }
 #endif

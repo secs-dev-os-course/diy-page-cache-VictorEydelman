@@ -20,6 +20,7 @@ typedef struct CacheBlock {
     int number;
     int page_number;
     time_t data;
+    time_t last_save;
     char* page;
     struct CacheBlock *prev; // Указатель на предыдущий блок (для LRU)
     struct CacheBlock *next; // Указатель на следующий блок (для LRU)

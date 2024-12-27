@@ -9,29 +9,22 @@
 
 using namespace std;
 size_t fileSize=0;
-void prepeare(size_t size) {
+void prepeare(size_t size,int fd) {
   std::random_device rd;
   std::mt19937_64 gen(rd());
   fileSize=size*512;
-  std::ofstream outFile("test.txt",std::ios::binary);
-  if (!outFile){
-    std::cerr<<"Mistake when file create"<<std::endl;
-  }
+  char* buf = new char[fileSize];
   std::uniform_int_distribution<int64_t> dis(0, 255);
-
-  for (int i=0;i<fileSize;i++){
-    outFile.put(static_cast<char>(dis(gen)));
+  for (size_t i = 0; i < fileSize; ++i) {
+      buf[i] = static_cast<char>(dis(gen));
   }
-  outFile.close();
+  lab2_lseek(fd,0,SEEK_SET);
+  lab2_write(fd,buf,fileSize);
   std::cout<<"File create "<<fileSize<<" KB";
 }
 
-static int ReadFileSequential() {
-    int fd = lab2_open("test.txt");
-    if(fd==-1){
-        return -1;
-    }
-    const size_t bufferSize = 1024 * 16; // 1 КБ
+static int ReadFileSequential(int fd) {
+    const size_t bufferSize = 1024 * 16;
     char* buf=new char[bufferSize];
     for(int i=0;i<bufferSize;i++){
         buf[i]='_';
@@ -40,8 +33,6 @@ static int ReadFileSequential() {
     lab2_read(fd,buf,bufferSize);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
-    cout<<9;
-    lab2_close(fd);
     size_t buf_size=fileSize;
     for(int i=0;i<bufferSize;i++){
         if(buf[i]=='_'){
@@ -49,18 +40,24 @@ static int ReadFileSequential() {
         }
     }
     return ((float)std::min(fileSize,buf_size))/((float)duration.count())/1024;
-
 }
 
 using namespace std;
 int main(){
   int read=0;
-  for(int i=1;i<1000;i++){
-      prepeare(i);
-      auto result = ReadFileSequential();
-      read += result;
-      cout << result<< " KB/s\n";
+  std::ofstream outFile("test.txt");
+  outFile.close();
+  int fd=lab2_open("test.txt");
+  if(fd!=-1) {
+      for (int i = 1; i < 500; i++) {
+          prepeare(i,fd);
+          auto result = ReadFileSequential(fd);
+          read += result;
+          cout << result << " KB/s\n";
 
+      }
+      std::cout << "Middle speed: " << read / 1000 << " KB/s\n";
+      lab2_close(fd);
   }
-  std::cout<<"Middle speed: "<<read/1000<<" KB/s\n";
+  return 0;
 }

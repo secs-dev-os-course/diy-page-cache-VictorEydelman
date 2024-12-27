@@ -11,11 +11,11 @@
 #include <sys/types.h>
 
 #include "lab2_cache.h"
-#define Page_count 256*1024
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+#define Page_count (256*1024)
 static Cache cache = {NULL,NULL,256*1024*1024};
 std::map<int,int> offset;
 using namespace std;
@@ -133,8 +133,9 @@ void addpage(int fd, CacheBlock *block, int page_num, char *page,bool t) {
     lseek(fd, page_num * Page_count, SEEK_SET);
     if (block->page_number == -1) {
         block->page = page;
-        block->page_number = 0;
+        //block->page_number = 0;
         block->last_save= time(0);
+        //block->page_number=0;
         if (block->prev != nullptr) {
             block->prev->next = block;
         } else {
@@ -145,6 +146,7 @@ void addpage(int fd, CacheBlock *block, int page_num, char *page,bool t) {
         } else {
             cache.cache_tail = block;
         }
+        //block->page_number=0;
     } else {
         t = false;
         while (true) {
@@ -194,37 +196,56 @@ ssize_t lab2_read(int fd, char *buf, size_t count) {
     for (int i = 0; i < Page_count; i++) {
         page[i] = '_';
     }
-    while (block->next!= nullptr && block->next->fd==fd && block->next->page_number < page_num) {
-        if (block->page_number == page_num) {
-            t = true;
+    for(off_t p_num=page_num;p_num<=(off_t)(o+count)/Page_count;p_num++) {
+        if(p_num>=(o+count)/Page_count){
             break;
-        } else {
-            if (block->next != nullptr){
-                if(block->next->fd == fd && block->next->page_number < page_num) {
-                    block = block->next;
-                }
-            } else {
+        }
+        while (block!= nullptr && block->fd==fd && block->page_number <= p_num) {
+            if (block->page_number == p_num) {
+                t = true;
                 break;
+            } else {
+                if (block->next != nullptr){
+                    if(block->next->fd == fd && block->next->page_number < p_num) {
+                        block = block->next;
+                    }
+                } else {
+                    break;
+                }
             }
         }
-    }
-    if (!t) {
-        lseek(fd, page_num * Page_count, SEEK_SET);
-        ssize_t bytesRead = read(fd, page, Page_count);
-        addpage(fd, block, page_num, page, t);
-        for (int i = o - page_num * Page_count; i < o - page_num * Page_count + count; i++) {
-            buf[i - o + page_num * Page_count] = page[i];
+        size_t cou=0;
+        if (!t) {
+            lseek(fd, p_num * Page_count, SEEK_SET);
+            ssize_t bytesRead = read(fd, page, Page_count);
+            addpage(fd, block, p_num, page, t);
+            block->page_number=p_num;
+            cou=(p_num+1)*Page_count-o;
+            if(o + count<Page_count*(p_num+1)){
+                cou=count;
+            }
+            for (int i = o - p_num * Page_count; i < o - p_num * Page_count + cou; i++) {
+                buf[i - o + p_num * Page_count]=block->page[i];
+            }
+            o+=Page_count*(p_num+1)-o;
+            count-=cou;
+            del();
+            return bytesRead;
+        } else {
+            cou=(p_num+1)*Page_count-o;
+            if(o + count<Page_count*(p_num+1)){
+                cou=count;
+            }
+            for (int i = o - p_num * Page_count; i < o - p_num * Page_count + cou; i++) {
+                buf[i - o + page_num * Page_count] = block->page[i];
+            }
+            o+=Page_count*(p_num+1)-o;
+            count-=cou;
+            del();
+            return 1;
         }
-        del();
-        return bytesRead;
-    } else {
-        for (int i = o - page_num * Page_count; i < o - page_num * Page_count + count; i++) {
-            buf[i - o + page_num * Page_count] = block->page[i];
-        }
-        del();
-        return 1;
     }
-   // return 1;
+    return 1;
 }
 off_t lab2_lseek(int fd, off_t off, int whence) {
     struct stat fileInfo;
@@ -259,34 +280,54 @@ ssize_t lab2_write(int fd, const char *buf, size_t count) {
     off_t o = offset[fd];
     int page_num = o / Page_count;
     bool t = false;
-    while (true) {
-        if (block->page_number == page_num) {
-            t = true;
-            break;
-        } else {
-            if (block->next != nullptr && block->next->fd == fd && block->next->page_number < page_num) {
-                block = block->next;
-            } else {
-                break;
-            }
-        }
-    }
     char *page = new char[Page_count];
     for (int i = 0; i < Page_count; i++) {
         page[i] = '_';
     }
-    if (t) {
-        for (int i = o - page_num * Page_count; i < o - page_num * Page_count + count; i++) {
-            block->page[i] = buf[i - o + page_num * Page_count];
+    for(off_t p_num=page_num;p_num<=(off_t)(o+count)/Page_count;p_num++) {
+        if(p_num>=(o+count)/Page_count){
+            break;
         }
-    } else {
-        lseek(fd, page_num * Page_count, SEEK_SET);
-        ssize_t bytesRead = read(fd, page, Page_count);
-        addpage(fd, block, page_num, page, t);
-        for (int i = o - page_num * Page_count; i < o - page_num * Page_count + count; i++) {
-            block->page[i] = buf[i - o + page_num * Page_count];
+        while (true) {
+            if (block->page_number == p_num) {
+                t = true;
+                break;
+            } else {
+                if (block->next != nullptr && block->next->fd == fd && block->next->page_number < page_num) {
+                    block = block->next;
+                } else {
+                    break;
+                }
+            }
         }
-        del();
+
+        size_t cou=0;
+        if (t) {
+            cou=(p_num+1)*Page_count-o;
+            if(o + count<Page_count*(p_num+1)){
+                cou=count;
+            }
+            for (int i = o - p_num * Page_count; i < o - p_num * Page_count + cou; i++) {
+                block->page[i] = buf[i - o + p_num * Page_count];
+            }
+            o+=Page_count*(p_num+1)-o;
+            count-=cou;
+        } else {
+            lseek(fd, p_num * Page_count, SEEK_SET);
+            ssize_t bytesRead = read(fd, page, Page_count);
+            addpage(fd, block, p_num, page, t);
+            block->page_number=p_num;
+            cou=(p_num+1)*Page_count-o;
+            if(o + count<Page_count*(p_num+1)){
+                cou=count;
+            }
+            for (int i = o - p_num * Page_count; i < o - p_num * Page_count + cou; i++) {
+                block->page[i] = buf[i - o + p_num * Page_count];
+            }
+            o+=Page_count*(p_num+1)-o;
+            count-=cou;
+            del();
+        }
     }
     return 1;
 }

@@ -66,7 +66,7 @@ typedef struct {
 ![image](https://github.com/user-attachments/assets/5a47a0fe-4817-4eb8-b393-04a51ba8b48a)
 
 С кэшем:<br>
-![image](https://github.com/user-attachments/assets/af413443-d687-4236-9f13-4424fc1fdbbf)
+![image](https://github.com/user-attachments/assets/7d831075-c733-48a2-b093-9513e9043bf7)
 
 Как видно скорость с кэшем уменьшилась в 30 раз.
 

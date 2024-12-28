@@ -7,7 +7,8 @@ project(app
 
 cmake_policy(SET CMP0076 NEW) # avoid warning of relative paths translation
 
-add_executable(app)
+add_executable(app
+        ../Cache/main.cpp)
 target_include_directories(app PRIVATE ${CMAKE_SOURCE_DIR})
 
 target_sources(app
